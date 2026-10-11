@@ -1,5 +1,6 @@
+import 'dart:async';
 import 'package:flutter/material.dart';
-import 'package:flutter_overlay_window/flutter_overlay_window.dart';
+import 'package:flutter/services.dart';
 
 class OverlayScreen extends StatefulWidget {
   const OverlayScreen({super.key});
@@ -8,11 +9,23 @@ class OverlayScreen extends StatefulWidget {
 }
 
 class _OverlayScreenState extends State<OverlayScreen> {
+  static const _channel = MethodChannel('nzwx/overlay_bridge');
+
   bool _panelOpen = false;
-  Offset _pos = const Offset(20, 200);
   int _tabIndex = 0;
 
-  // === Menu per tab ===
+  // FOV
+  bool _fovEnabled = false;
+  double _fovRadius = 200;
+
+  // Crosshair
+  bool _crosshairEnabled = false;
+  String _crosshairStyle = 'dot';
+  double _crosshairSize = 20;
+
+  // Game detected
+  String _gameDetected = '';
+
   final Map<String, Map<String, bool>> _tabs = {
     'AIM': {
       'Aim Assist': false,
@@ -41,48 +54,108 @@ class _OverlayScreenState extends State<OverlayScreen> {
     },
   };
 
+  Offset _pos = const Offset(20, 200);
+
+  @override
+  void initState() {
+    super.initState();
+    _channel.setMethodCallHandler(_onMethod);
+  }
+
+  Future<dynamic> _onMethod(MethodCall call) async {
+    switch (call.method) {
+      case 'updateFov':
+        setState(() {
+          _fovEnabled = call.arguments['enabled'] ?? false;
+          _fovRadius = (call.arguments['radius'] ?? 200).toDouble();
+        });
+        break;
+      case 'updateCrosshair':
+        setState(() {
+          _crosshairEnabled = call.arguments['enabled'] ?? false;
+          _crosshairStyle = call.arguments['style'] ?? 'dot';
+          _crosshairSize = (call.arguments['size'] ?? 20).toDouble();
+        });
+        break;
+      case 'updateGame':
+        setState(() => _gameDetected = call.arguments['game'] ?? '');
+        break;
+    }
+    return null;
+  }
+
   @override
   Widget build(BuildContext context) {
     return Material(
       color: Colors.transparent,
-      child: IgnorePointer(
-        // === KUNCI: cuma area bubble & panel yang nerima touch ===
-        ignoring: false,
-        child: Stack(
-          children: [
-            // Area kosong transparan yang gak nerima input
+      child: Stack(
+        children: [
+          // === FOV CIRCLE (center layar) ===
+          if (_fovEnabled)
             Positioned.fill(
               child: IgnorePointer(
-                child: Container(color: Colors.transparent),
+                child: CustomPaint(
+                  painter: _FovPainter(radius: _fovRadius),
+                ),
               ),
             ),
 
-            // Bubble
-            if (!_panelOpen)
-              Positioned(
-                left: _pos.dx,
-                top: _pos.dy,
-                child: GestureDetector(
-                  onPanUpdate: (d) => setState(() => _pos += d.delta),
-                  onTap: () => setState(() => _panelOpen = true),
-                  child: _buildBubble(),
+          // === CROSSHAIR (center layar) ===
+          if (_crosshairEnabled)
+            Positioned.fill(
+              child: IgnorePointer(
+                child: CustomPaint(
+                  painter: _CrosshairPainter(
+                    style: _crosshairStyle,
+                    size: _crosshairSize,
+                  ),
                 ),
               ),
+            ),
 
-            // Panel
-            if (_panelOpen)
-              Positioned(
-                left: 8,
-                top: 60,
-                child: _buildPanel(),
+          // === GAME BADGE (pojok kanan atas) ===
+          if (_gameDetected.isNotEmpty)
+            Positioned(
+              right: 12, top: 40,
+              child: IgnorePointer(
+                child: Container(
+                  padding: const EdgeInsets.symmetric(horizontal: 10, vertical: 4),
+                  decoration: BoxDecoration(
+                    color: Colors.green.withOpacity(.85),
+                    borderRadius: BorderRadius.circular(20),
+                  ),
+                  child: Text(
+                    '🎮 $_gameDetected',
+                    style: const TextStyle(color: Colors.white, fontSize: 10, fontWeight: FontWeight.bold),
+                  ),
+                ),
               ),
-          ],
-        ),
+            ),
+
+          // === BUBBLE ===
+          if (!_panelOpen)
+            Positioned(
+              left: _pos.dx,
+              top: _pos.dy,
+              child: GestureDetector(
+                onPanUpdate: (d) => setState(() => _pos += d.delta),
+                onTap: () => setState(() => _panelOpen = true),
+                child: _buildBubble(),
+              ),
+            ),
+
+          // === PANEL ===
+          if (_panelOpen)
+            Positioned(
+              left: 8,
+              top: 60,
+              child: _buildPanel(),
+            ),
+        ],
       ),
     );
   }
 
-  // === BUBBLE KECIL 36x36 ===
   Widget _buildBubble() {
     return Container(
       width: 36, height: 36,
@@ -90,48 +163,33 @@ class _OverlayScreenState extends State<OverlayScreen> {
         shape: BoxShape.circle,
         border: Border.all(color: const Color(0xFFA855F7), width: 1.5),
         boxShadow: [
-          BoxShadow(
-            color: const Color(0xFFA855F7).withOpacity(.9),
-            blurRadius: 10, spreadRadius: 1,
-          ),
+          BoxShadow(color: const Color(0xFFA855F7).withOpacity(.9), blurRadius: 10, spreadRadius: 1),
         ],
       ),
       child: ClipOval(
-        child: Image.asset(
-          'assets/logo.jpg',
-          fit: BoxFit.cover,
+        child: Image.asset('assets/logo.jpg', fit: BoxFit.cover,
           errorBuilder: (_, __, ___) => Container(
             color: const Color(0xFFA855F7),
-            child: const Center(
-              child: Text('G',
-                style: TextStyle(color: Colors.white, fontSize: 16, fontWeight: FontWeight.bold),
-              ),
-            ),
+            child: const Center(child: Text('G',
+              style: TextStyle(color: Colors.white, fontSize: 16, fontWeight: FontWeight.bold))),
           ),
         ),
       ),
     );
   }
 
-  // === PANEL LANDSCAPE 16:9 (280 x 158) ===
   Widget _buildPanel() {
-    const double w = 290;
-    const double h = 170;
-
     return Container(
-      width: w,
-      height: h,
+      width: 290,
+      height: 190,
       decoration: BoxDecoration(
         color: const Color(0xFF0A0A12).withOpacity(0.97),
         borderRadius: BorderRadius.circular(10),
         border: Border.all(color: const Color(0xFFA855F7), width: 1.2),
-        boxShadow: [
-          BoxShadow(color: Colors.black.withOpacity(.8), blurRadius: 14),
-        ],
+        boxShadow: [BoxShadow(color: Colors.black.withOpacity(.8), blurRadius: 14)],
       ),
       child: Column(
         children: [
-          // === HEADER ===
           Container(
             height: 26,
             padding: const EdgeInsets.symmetric(horizontal: 8),
@@ -143,20 +201,19 @@ class _OverlayScreenState extends State<OverlayScreen> {
               children: [
                 Row(
                   children: [
-                    ClipOval(
-                      child: Image.asset('assets/logo.jpg',
-                        width: 14, height: 14, fit: BoxFit.cover,
-                        errorBuilder: (_, __, ___) => const Icon(Icons.security,
-                          color: Color(0xFFA855F7), size: 14),
-                      ),
-                    ),
+                    ClipOval(child: Image.asset('assets/logo.jpg',
+                      width: 14, height: 14, fit: BoxFit.cover,
+                      errorBuilder: (_, __, ___) => const Icon(Icons.security,
+                        color: Color(0xFFA855F7), size: 14))),
                     const SizedBox(width: 4),
                     const Text('G CHEATS',
-                      style: TextStyle(
-                        color: Colors.white, fontSize: 10,
-                        fontWeight: FontWeight.bold, letterSpacing: 1.5,
-                      ),
-                    ),
+                      style: TextStyle(color: Colors.white, fontSize: 10,
+                        fontWeight: FontWeight.bold, letterSpacing: 1.5)),
+                    if (_gameDetected.isNotEmpty) ...[
+                      const SizedBox(width: 6),
+                      Text('• $_gameDetected',
+                        style: const TextStyle(color: Colors.greenAccent, fontSize: 8)),
+                    ],
                   ],
                 ),
                 GestureDetector(
@@ -167,7 +224,6 @@ class _OverlayScreenState extends State<OverlayScreen> {
             ),
           ),
 
-          // === TAB ROW ===
           Container(
             height: 22,
             padding: const EdgeInsets.symmetric(horizontal: 4),
@@ -188,14 +244,11 @@ class _OverlayScreenState extends State<OverlayScreen> {
                         borderRadius: BorderRadius.circular(4),
                       ),
                       child: Center(
-                        child: Text(
-                          name,
+                        child: Text(name,
                           style: TextStyle(
                             color: active ? Colors.white : Colors.white54,
                             fontSize: 9,
-                            fontWeight: active ? FontWeight.bold : FontWeight.normal,
-                          ),
-                        ),
+                            fontWeight: active ? FontWeight.bold : FontWeight.normal)),
                       ),
                     ),
                   ),
@@ -204,20 +257,16 @@ class _OverlayScreenState extends State<OverlayScreen> {
             ),
           ),
 
-          // === CONTENT (scrollable) ===
           Expanded(
             child: SingleChildScrollView(
               padding: const EdgeInsets.symmetric(horizontal: 6, vertical: 2),
               child: Column(
                 children: _tabs[_tabs.keys.elementAt(_tabIndex)]!
-                    .entries
-                    .map((e) => _menuRow(e.key, e.value))
-                    .toList(),
+                    .entries.map((e) => _menuRow(e.key, e.value)).toList(),
               ),
             ),
           ),
 
-          // === FOOTER BUTTONS ===
           Container(
             height: 26,
             padding: const EdgeInsets.symmetric(horizontal: 6),
@@ -232,8 +281,7 @@ class _OverlayScreenState extends State<OverlayScreen> {
                     child: ElevatedButton(
                       onPressed: () {
                         setState(() {
-                          _tabs[_tabs.keys.elementAt(_tabIndex)]!
-                              .updateAll((k, v) => true);
+                          _tabs[_tabs.keys.elementAt(_tabIndex)]!.updateAll((k, v) => true);
                         });
                       },
                       style: ElevatedButton.styleFrom(
@@ -243,8 +291,7 @@ class _OverlayScreenState extends State<OverlayScreen> {
                         tapTargetSize: MaterialTapTargetSize.shrinkWrap,
                         shape: RoundedRectangleBorder(borderRadius: BorderRadius.circular(3)),
                       ),
-                      child: const Text('ON',
-                        style: TextStyle(fontSize: 9, fontWeight: FontWeight.bold)),
+                      child: const Text('ON', style: TextStyle(fontSize: 9, fontWeight: FontWeight.bold)),
                     ),
                   ),
                 ),
@@ -255,8 +302,7 @@ class _OverlayScreenState extends State<OverlayScreen> {
                     child: ElevatedButton(
                       onPressed: () {
                         setState(() {
-                          _tabs[_tabs.keys.elementAt(_tabIndex)]!
-                              .updateAll((k, v) => false);
+                          _tabs[_tabs.keys.elementAt(_tabIndex)]!.updateAll((k, v) => false);
                         });
                       },
                       style: ElevatedButton.styleFrom(
@@ -266,8 +312,7 @@ class _OverlayScreenState extends State<OverlayScreen> {
                         tapTargetSize: MaterialTapTargetSize.shrinkWrap,
                         shape: RoundedRectangleBorder(borderRadius: BorderRadius.circular(3)),
                       ),
-                      child: const Text('OFF',
-                        style: TextStyle(fontSize: 9, fontWeight: FontWeight.bold)),
+                      child: const Text('OFF', style: TextStyle(fontSize: 9, fontWeight: FontWeight.bold)),
                     ),
                   ),
                 ),
@@ -293,9 +338,7 @@ class _OverlayScreenState extends State<OverlayScreen> {
               activeColor: const Color(0xFFA855F7),
               materialTapTargetSize: MaterialTapTargetSize.shrinkWrap,
               onChanged: (v) {
-                setState(() {
-                  _tabs[_tabs.keys.elementAt(_tabIndex)]![label] = v;
-                });
+                setState(() => _tabs[_tabs.keys.elementAt(_tabIndex)]![label] = v);
               },
             ),
           ),
@@ -303,4 +346,56 @@ class _OverlayScreenState extends State<OverlayScreen> {
       ),
     );
   }
+}
+
+// === FOV PAINTER ===
+class _FovPainter extends CustomPainter {
+  final double radius;
+  _FovPainter({required this.radius});
+
+  @override
+  void paint(Canvas canvas, Size size) {
+    final center = Offset(size.width / 2, size.height / 2);
+    final paint = Paint()
+      ..color = const Color(0xFFA855F7).withOpacity(0.9)
+      ..style = PaintingStyle.stroke
+      ..strokeWidth = 1.5;
+    canvas.drawCircle(center, radius, paint);
+
+    // Crosshair kecil di tengah FOV
+    final dotPaint = Paint()..color = const Color(0xFFA855F7);
+    canvas.drawCircle(center, 2, dotPaint);
+  }
+
+  @override
+  bool shouldRepaint(covariant _FovPainter old) => old.radius != radius;
+}
+
+// === CROSSHAIR PAINTER ===
+class _CrosshairPainter extends CustomPainter {
+  final String style;
+  final double size;
+  _CrosshairPainter({required this.style, required this.size});
+
+  @override
+  void paint(Canvas canvas, Size size) {
+    final center = Offset(size.width / 2, size.height / 2);
+    final paint = Paint()
+      ..color = const Color(0xFF00FF00)
+      ..strokeWidth = 2;
+
+    if (style == 'dot') {
+      canvas.drawCircle(center, this.size / 4, paint..style = PaintingStyle.fill);
+    } else if (style == 'cross') {
+      final half = this.size / 2;
+      canvas.drawLine(Offset(center.dx - half, center.dy), Offset(center.dx + half, center.dy), paint);
+      canvas.drawLine(Offset(center.dx, center.dy - half), Offset(center.dx, center.dy + half), paint);
+    } else if (style == 'circle') {
+      canvas.drawCircle(center, this.size / 2, paint..style = PaintingStyle.stroke);
+    }
+  }
+
+  @override
+  bool shouldRepaint(covariant _CrosshairPainter old) =>
+      old.style != style || old.size != size;
 }

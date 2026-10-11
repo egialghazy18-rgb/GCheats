@@ -2,6 +2,8 @@ import 'package:flutter/material.dart';
 import 'package:flutter_overlay_window/flutter_overlay_window.dart';
 import '../services/shizuku_service.dart';
 import '../services/cheat_service.dart';
+import '../services/game_detector.dart';
+import '../services/overlay_bridge.dart';
 
 class PanelScreen extends StatefulWidget {
   const PanelScreen({super.key});
@@ -14,6 +16,14 @@ class _PanelScreenState extends State<PanelScreen> with WidgetsBindingObserver {
   bool _overlayGranted = false;
   bool _overlayActive = false;
   bool _checking = true;
+  String? _detectedGame;
+
+  // State fitur
+  bool _fovEnabled = false;
+  double _fovRadius = 200;
+  bool _crosshairEnabled = false;
+  String _crosshairStyle = 'dot';
+  double _crosshairSize = 20;
 
   final Map<String, bool> _menus = {
     'Aim Assist': false,
@@ -36,6 +46,7 @@ class _PanelScreenState extends State<PanelScreen> with WidgetsBindingObserver {
   @override
   void dispose() {
     WidgetsBinding.instance.removeObserver(this);
+    GameDetector.stopWatching();
     super.dispose();
   }
 
@@ -61,6 +72,14 @@ class _PanelScreenState extends State<PanelScreen> with WidgetsBindingObserver {
       _shizukuReady = shizuku;
       _checking = false;
     });
+
+    // Mulai deteksi game
+    GameDetector.startWatching((game) {
+      if (!mounted) return;
+      setState(() => _detectedGame = game);
+      OverlayBridge.sendGameDetected(game);
+    });
+
     if (!granted) _requestOverlayPermission();
   }
 
@@ -89,7 +108,6 @@ class _PanelScreenState extends State<PanelScreen> with WidgetsBindingObserver {
     }
 
     try {
-      // === UKURAN CUMA 320x220, POSISI DI KIRI ATAS ===
       await FlutterOverlayWindow.showOverlay(
         enableDrag: false,
         overlayTitle: 'GCheats Aktif',
@@ -97,9 +115,9 @@ class _PanelScreenState extends State<PanelScreen> with WidgetsBindingObserver {
         flag: OverlayFlag.defaultFlag,
         visibility: NotificationVisibility.visibilityPublic,
         positionGravity: PositionGravity.none,
-        height: 220,
-        width: 320,
-        startPosition: const OverlayPosition(0, 80),
+        height: WindowSize.fullCover,
+        width: WindowSize.fullCover,
+        startPosition: const OverlayPosition(0, 0),
       );
       if (!mounted) return;
       setState(() => _overlayActive = true);
@@ -109,6 +127,23 @@ class _PanelScreenState extends State<PanelScreen> with WidgetsBindingObserver {
         SnackBar(content: Text('Gagal buka overlay: $e')),
       );
     }
+  }
+
+  void _toggleFov(bool v) {
+    setState(() => _fovEnabled = v);
+    OverlayBridge.sendFov(enabled: v, radius: _fovRadius);
+  }
+
+  void _changeFovRadius(double r) {
+    setState(() => _fovRadius = r);
+    OverlayBridge.sendFov(enabled: _fovEnabled, radius: r);
+  }
+
+  void _toggleCrosshair(bool v) {
+    setState(() => _crosshairEnabled = v);
+    OverlayBridge.sendCrosshair(
+      enabled: v, style: _crosshairStyle, size: _crosshairSize,
+    );
   }
 
   void _toggle(String key, bool val) async {
@@ -142,9 +177,41 @@ class _PanelScreenState extends State<PanelScreen> with WidgetsBindingObserver {
               ListView(
                 padding: const EdgeInsets.all(16),
                 children: [
+                  // === GAME DETECTED BANNER ===
+                  Container(
+                    padding: const EdgeInsets.all(14),
+                    margin: const EdgeInsets.only(bottom: 14),
+                    decoration: BoxDecoration(
+                      gradient: LinearGradient(
+                        colors: _detectedGame != null
+                          ? [const Color(0xFF16A34A), const Color(0xFF22C55E)]
+                          : [const Color(0xFF3F3F46), const Color(0xFF52525B)],
+                      ),
+                      borderRadius: BorderRadius.circular(12),
+                    ),
+                    child: Row(
+                      children: [
+                        Icon(
+                          _detectedGame != null ? Icons.sports_esports : Icons.search,
+                          color: Colors.white, size: 22,
+                        ),
+                        const SizedBox(width: 10),
+                        Expanded(
+                          child: Text(
+                            _detectedGame != null
+                              ? '🎮 Game terdeteksi: $_detectedGame'
+                              : 'Mencari game... buka FF / ML sekarang',
+                            style: const TextStyle(color: Colors.white, fontSize: 13, fontWeight: FontWeight.bold),
+                          ),
+                        ),
+                      ],
+                    ),
+                  ),
+
+                  // === OVERLAY CONTROL ===
                   Container(
                     padding: const EdgeInsets.all(16),
-                    margin: const EdgeInsets.only(bottom: 16),
+                    margin: const EdgeInsets.only(bottom: 14),
                     decoration: BoxDecoration(
                       color: const Color(0xFF13131A),
                       borderRadius: BorderRadius.circular(12),
@@ -156,9 +223,7 @@ class _PanelScreenState extends State<PanelScreen> with WidgetsBindingObserver {
                       crossAxisAlignment: CrossAxisAlignment.start,
                       children: [
                         Text(
-                          _overlayGranted
-                            ? '✓ Izin overlay OK'
-                            : '⚠ Butuh izin "Tampilkan di atas aplikasi lain"',
+                          _overlayGranted ? '✓ Izin overlay OK' : '⚠ Butuh izin overlay',
                           style: TextStyle(
                             color: _overlayGranted ? Colors.greenAccent : Colors.orangeAccent,
                             fontSize: 13, fontWeight: FontWeight.bold,
@@ -192,9 +257,82 @@ class _PanelScreenState extends State<PanelScreen> with WidgetsBindingObserver {
                       ],
                     ),
                   ),
+
+                  // === FOV CIRCLE ===
+                  _sectionCard(
+                    title: 'FOV CIRCLE',
+                    children: [
+                      Row(
+                        mainAxisAlignment: MainAxisAlignment.spaceBetween,
+                        children: [
+                          const Text('Aktifkan FOV', style: TextStyle(color: Colors.white, fontSize: 13)),
+                          Switch(
+                            value: _fovEnabled,
+                            activeColor: const Color(0xFFA855F7),
+                            onChanged: _toggleFov,
+                          ),
+                        ],
+                      ),
+                      Row(
+                        children: [
+                          const Text('Radius', style: TextStyle(color: Colors.white70, fontSize: 12)),
+                          Expanded(
+                            child: Slider(
+                              value: _fovRadius,
+                              min: 50, max: 400,
+                              activeColor: const Color(0xFFA855F7),
+                              onChanged: _changeFovRadius,
+                            ),
+                          ),
+                          Text('${_fovRadius.toInt()}', style: const TextStyle(color: Colors.white, fontSize: 12)),
+                        ],
+                      ),
+                    ],
+                  ),
+
+                  // === CROSSHAIR ===
+                  _sectionCard(
+                    title: 'CROSSHAIR',
+                    children: [
+                      Row(
+                        mainAxisAlignment: MainAxisAlignment.spaceBetween,
+                        children: [
+                          const Text('Aktifkan Crosshair', style: TextStyle(color: Colors.white, fontSize: 13)),
+                          Switch(
+                            value: _crosshairEnabled,
+                            activeColor: const Color(0xFFA855F7),
+                            onChanged: _toggleCrosshair,
+                          ),
+                        ],
+                      ),
+                      Row(
+                        children: [
+                          const Text('Size', style: TextStyle(color: Colors.white70, fontSize: 12)),
+                          Expanded(
+                            child: Slider(
+                              value: _crosshairSize,
+                              min: 5, max: 60,
+                              activeColor: const Color(0xFFA855F7),
+                              onChanged: (v) {
+                                setState(() => _crosshairSize = v);
+                                OverlayBridge.sendCrosshair(
+                                  enabled: _crosshairEnabled,
+                                  style: _crosshairStyle,
+                                  size: v,
+                                );
+                              },
+                            ),
+                          ),
+                          Text('${_crosshairSize.toInt()}', style: const TextStyle(color: Colors.white, fontSize: 12)),
+                        ],
+                      ),
+                    ],
+                  ),
+
+                  // === SHIZUKU ===
                   Container(
                     padding: const EdgeInsets.symmetric(horizontal: 16, vertical: 12),
-                    margin: const EdgeInsets.only(bottom: 16),
+                    margin: const EdgeInsets.only(bottom: 14),
                     decoration: BoxDecoration(
                       color: const Color(0xFF13131A),
                       borderRadius: BorderRadius.circular(12),
@@ -214,6 +352,8 @@ class _PanelScreenState extends State<PanelScreen> with WidgetsBindingObserver {
                       ],
                     ),
                   ),
+
+                  // === MENU CHEAT ===
                   ..._menus.keys.map((k) => Container(
                     margin: const EdgeInsets.only(bottom: 10),
                     padding: const EdgeInsets.symmetric(horizontal: 16, vertical: 12),
@@ -238,6 +378,28 @@ class _PanelScreenState extends State<PanelScreen> with WidgetsBindingObserver {
               ),
             ],
           ),
+    );
+  }
+
+  Widget _sectionCard({required String title, required List<Widget> children}) {
+    return Container(
+      padding: const EdgeInsets.all(14),
+      margin: const EdgeInsets.only(bottom: 14),
+      decoration: BoxDecoration(
+        color: const Color(0xFF13131A),
+        borderRadius: BorderRadius.circular(12),
+        border: Border.all(color: const Color(0xFFA855F7).withOpacity(0.4)),
+      ),
+      child: Column(
+        crossAxisAlignment: CrossAxisAlignment.start,
+        children: [
+          Text(title,
+            style: const TextStyle(color: Color(0xFFA855F7), fontSize: 12, fontWeight: FontWeight.bold, letterSpacing: 2),
+          ),
+          const SizedBox(height: 8),
+          ...children,
+        ],
+      ),
     );
   }
 }
