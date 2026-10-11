@@ -79,33 +79,50 @@ class _PanelScreenState extends State<PanelScreen> {
           ),
         ],
       ),
-      body: _checking
-        ? const Center(child: CircularProgressIndicator(color: Color(0xFFA855F7)))
-        : ListView(
-            padding: const EdgeInsets.all(16),
-            children: _menus.keys.map((k) {
-              return Container(
-                margin: const EdgeInsets.only(bottom: 10),
-                padding: const EdgeInsets.symmetric(horizontal: 16, vertical: 12),
-                decoration: BoxDecoration(
-                  color: const Color(0xFF13131A),
-                  borderRadius: BorderRadius.circular(12),
-                  border: Border.all(color: const Color(0xFF22222E)),
+      body: Stack(
+        children: [
+          // Logo transparan di background
+          Positioned.fill(
+            child: Opacity(
+              opacity: 0.08,
+              child: Center(
+                child: Image.asset(
+                  'assets/logo.jpg',
+                  fit: BoxFit.contain,
                 ),
-                child: Row(
-                  mainAxisAlignment: MainAxisAlignment.spaceBetween,
-                  children: [
-                    Text(k, style: const TextStyle(color: Colors.white, fontSize: 14, letterSpacing: 1)),
-                    Switch(
-                      value: _menus[k]!,
-                      activeColor: const Color(0xFFA855F7),
-                      onChanged: (v) => _toggle(k, v),
-                    ),
-                  ],
-                ),
-              );
-            }).toList(),
+              ),
+            ),
           ),
+
+          _checking
+            ? const Center(child: CircularProgressIndicator(color: Color(0xFFA855F7)))
+            : ListView(
+                padding: const EdgeInsets.all(16),
+                children: _menus.keys.map((k) {
+                  return Container(
+                    margin: const EdgeInsets.only(bottom: 10),
+                    padding: const EdgeInsets.symmetric(horizontal: 16, vertical: 12),
+                    decoration: BoxDecoration(
+                      color: const Color(0xFF13131A).withOpacity(0.9),
+                      borderRadius: BorderRadius.circular(12),
+                      border: Border.all(color: const Color(0xFF22222E)),
+                    ),
+                    child: Row(
+                      mainAxisAlignment: MainAxisAlignment.spaceBetween,
+                      children: [
+                        Text(k, style: const TextStyle(color: Colors.white, fontSize: 14, letterSpacing: 1)),
+                        Switch(
+                          value: _menus[k]!,
+                          activeColor: const Color(0xFFA855F7),
+                          onChanged: (v) => _toggle(k, v),
+                        ),
+                      ],
+                    ),
+                  );
+                }).toList(),
+              ),
+        ],
+      ),
     );
   }
 }
