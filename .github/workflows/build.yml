@@ -35,10 +35,14 @@ jobs:
         run: flutter pub get
 
       - name: Build APK
-        run: flutter build apk --release
+        run: flutter build apk --release --target-platform android-arm64 --tree-shake-icons
+
+      - name: Rename APK
+        run: |
+          mv build/app/outputs/flutter-apk/app-release.apk build/app/outputs/flutter-apk/gcheats-arm64.apk
 
       - name: Upload APK
         uses: actions/upload-artifact@v4
         with:
           name: gcheats-apk
-          path: build/app/outputs/flutter-apk/app-release.apk
+          path: build/app/outputs/flutter-apk/gcheats-arm64.apk

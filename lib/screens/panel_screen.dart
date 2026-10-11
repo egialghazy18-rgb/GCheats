@@ -9,7 +9,7 @@ class PanelScreen extends StatefulWidget {
   State<PanelScreen> createState() => _PanelScreenState();
 }
 
-class _PanelScreenState extends State<PanelScreen> {
+class _PanelScreenState extends State<PanelScreen> with WidgetsBindingObserver {
   bool _shizukuReady = false;
   bool _overlayGranted = false;
   bool _overlayActive = false;
@@ -33,36 +33,67 @@ class _PanelScreenState extends State<PanelScreen> {
   @override
   void initState() {
     super.initState();
+    WidgetsBinding.instance.addObserver(this);
     _initAll();
   }
 
+  @override
+  void dispose() {
+    WidgetsBinding.instance.removeObserver(this);
+    super.dispose();
+  }
+
+  // Refresh cek izin tiap app balik dari background (Settings)
+  @override
+  void didChangeAppLifecycleState(AppLifecycleState state) {
+    if (state == AppLifecycleState.resumed) {
+      _refreshPermission();
+    }
+  }
+
+  Future<void> _refreshPermission() async {
+    final granted = await FlutterOverlayWindow.isPermissionGranted();
+    if (mounted && granted != _overlayGranted) {
+      setState(() => _overlayGranted = granted);
+    }
+  }
+
   Future<void> _initAll() async {
+    // TUNGGU sebentar — Android kadang butuh waktu buat flush state izin
+    await Future.delayed(const Duration(milliseconds: 500));
+
     final granted = await FlutterOverlayWindow.isPermissionGranted();
     final shizuku = await ShizukuService.requestPermission();
 
+    if (!mounted) return;
     setState(() {
       _overlayGranted = granted;
       _shizukuReady = shizuku;
       _checking = false;
     });
 
-    if (!granted) {
-      _requestOverlayPermission();
-    }
+    if (!granted) _requestOverlayPermission();
   }
 
   Future<void> _requestOverlayPermission() async {
     await FlutterOverlayWindow.requestPermission();
-    await Future.delayed(const Duration(seconds: 1));
+    // delay lebih panjang — user butuh waktu nyalain toggle
+    await Future.delayed(const Duration(milliseconds: 1500));
     final granted = await FlutterOverlayWindow.isPermissionGranted();
+    if (!mounted) return;
     setState(() => _overlayGranted = granted);
   }
 
   Future<void> _showOverlay() async {
-    if (!_overlayGranted) {
+    // Refresh dulu sebelum action
+    final granted = await FlutterOverlayWindow.isPermissionGranted();
+    if (!mounted) return;
+    if (!granted) {
+      setState(() => _overlayGranted = false);
       _requestOverlayPermission();
       return;
     }
+    setState(() => _overlayGranted = true);
 
     if (_overlayActive) {
       await FlutterOverlayWindow.closeOverlay();
@@ -70,18 +101,26 @@ class _PanelScreenState extends State<PanelScreen> {
       return;
     }
 
-    await FlutterOverlayWindow.showOverlay(
-      enableDrag: false,
-      overlayTitle: 'GCheats',
-      overlayContent: 'Panel aktif',
-      flag: OverlayFlag.defaultFlag,
-      visibility: NotificationVisibility.visibilityPublic,
-      positionGravity: PositionGravity.none,
-      height: WindowSize.fullCover,
-      width: WindowSize.fullCover,
-      startPosition: const OverlayPosition(0, 0),
-    );
-    setState(() => _overlayActive = true);
+    try {
+      await FlutterOverlayWindow.showOverlay(
+        enableDrag: false,
+        overlayTitle: 'GCheats Aktif',
+        overlayContent: 'Panel GCheats sedang berjalan',
+        flag: OverlayFlag.defaultFlag,
+        visibility: NotificationVisibility.visibilityPublic,
+        positionGravity: PositionGravity.none,
+        height: WindowSize.fullCover,
+        width: WindowSize.fullCover,
+        startPosition: const OverlayPosition(0, 0),
+      );
+      if (!mounted) return;
+      setState(() => _overlayActive = true);
+    } catch (e) {
+      if (!mounted) return;
+      ScaffoldMessenger.of(context).showSnackBar(
+        SnackBar(content: Text('Gagal buka overlay: $e')),
+      );
+    }
   }
 
   void _toggle(String key, bool val) async {
@@ -95,6 +134,12 @@ class _PanelScreenState extends State<PanelScreen> {
       appBar: AppBar(
         backgroundColor: const Color(0xFF0A0A12),
         title: const Text('G CHEATS', style: TextStyle(letterSpacing: 4, color: Colors.white)),
+        actions: [
+          IconButton(
+            icon: const Icon(Icons.refresh, color: Colors.white),
+            onPressed: _refreshPermission,
+          ),
+        ],
       ),
       body: _checking
         ? const Center(child: CircularProgressIndicator(color: Color(0xFFA855F7)))
@@ -140,7 +185,8 @@ class _PanelScreenState extends State<PanelScreen> {
                             child: ElevatedButton(
                               onPressed: _requestOverlayPermission,
                               style: ElevatedButton.styleFrom(backgroundColor: Colors.orangeAccent),
-                              child: const Text('MINTA IZIN', style: TextStyle(color: Colors.black, fontWeight: FontWeight.bold)),
+                              child: const Text('MINTA IZIN',
+                                style: TextStyle(color: Colors.black, fontWeight: FontWeight.bold)),
                             ),
                           ),
                         const SizedBox(height: 8),
