@@ -2,6 +2,16 @@ import 'package:flutter/material.dart';
 import 'package:shared_preferences/shared_preferences.dart';
 import 'screens/login_screen.dart';
 import 'screens/panel_screen.dart';
+import 'screens/overlay_screen.dart';
+
+@pragma('vm:entry-point')
+void overlayMain() {
+  WidgetsFlutterBinding.ensureInitialized();
+  runApp(const MaterialApp(
+    debugShowCheckedModeBanner: false,
+    home: OverlayScreen(),
+  ));
+}
 
 void main() async {
   WidgetsFlutterBinding.ensureInitialized();

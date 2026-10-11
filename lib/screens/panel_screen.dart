@@ -1,4 +1,6 @@
 import 'package:flutter/material.dart';
+import 'package:flutter_overlay_window/flutter_overlay_window.dart';
+import 'package:permission_handler/permission_handler.dart';
 import '../services/shizuku_service.dart';
 import '../services/cheat_service.dart';
 
@@ -10,6 +12,8 @@ class PanelScreen extends StatefulWidget {
 
 class _PanelScreenState extends State<PanelScreen> {
   bool _shizukuReady = false;
+  bool _overlayGranted = false;
+  bool _overlayActive = false;
   bool _checking = true;
 
   final Map<String, bool> _menus = {
@@ -30,21 +34,61 @@ class _PanelScreenState extends State<PanelScreen> {
   @override
   void initState() {
     super.initState();
-    _initShizuku();
+    _initAll();
   }
 
-  Future<void> _initShizuku() async {
-    final ok = await ShizukuService.requestPermission();
-    setState(() { _shizukuReady = ok; _checking = false; });
+  Future<void> _initAll() async {
+    // 1. Cek izin overlay
+    final granted = await FlutterOverlayWindow.isPermissionGranted();
+    // 2. Cek Shizuku
+    final shizuku = await ShizukuService.requestPermission();
+
+    setState(() {
+      _overlayGranted = granted;
+      _shizukuReady = shizuku;
+      _checking = false;
+    });
+
+    // 3. Kalau belum granted → minta
+    if (!granted) {
+      _requestOverlayPermission();
+    }
+  }
+
+  Future<void> _requestOverlayPermission() async {
+    await FlutterOverlayWindow.requestPermission();
+    await Future.delayed(const Duration(seconds: 1));
+    final granted = await FlutterOverlayWindow.isPermissionGranted();
+    setState(() => _overlayGranted = granted);
+  }
+
+  Future<void> _showOverlay() async {
+    if (!_overlayGranted) {
+      _requestOverlayPermission();
+      return;
+    }
+
+    if (_overlayActive) {
+      await FlutterOverlayWindow.closeOverlay();
+      setState(() => _overlayActive = false);
+      return;
+    }
+
+    await FlutterOverlayWindow.showOverlay(
+      enableDrag: true,
+      overlayTitle: 'GCheats',
+      overlayContent: 'Panel aktif',
+      flag: OverlayFlag.defaultFlag,
+      visibility: NotificationVisibility.visibilityPublic,
+      positionGravity: PositionGravity.auto,
+      height: 400,
+      width: 320,
+      startPosition: const OverlayPosition(0, 100),
+    );
+    setState(() => _overlayActive = true);
   }
 
   void _toggle(String key, bool val) async {
-    if (!_shizukuReady) {
-      ScaffoldMessenger.of(context).showSnackBar(
-        const SnackBar(content: Text('Shizuku belum aktif!')),
-      );
-      return;
-    }
     setState(() => _menus[key] = val);
     await CheatService.sendToggle(key, val);
   }
@@ -55,74 +99,128 @@ class _PanelScreenState extends State<PanelScreen> {
       appBar: AppBar(
         backgroundColor: const Color(0xFF0A0A12),
         title: const Text('G CHEATS', style: TextStyle(letterSpacing: 4, color: Colors.white)),
-        actions: [
-          Padding(
-            padding: const EdgeInsets.only(right: 14),
-            child: Center(
-              child: Container(
-                padding: const EdgeInsets.symmetric(horizontal: 10, vertical: 5),
-                decoration: BoxDecoration(
-                  color: _shizukuReady ? Colors.green.withOpacity(.2) : Colors.red.withOpacity(.2),
-                  borderRadius: BorderRadius.circular(20),
-                  border: Border.all(color: _shizukuReady ? Colors.greenAccent : Colors.redAccent),
-                ),
-                child: Text(
-                  _shizukuReady ? '● SHIZUKU OK' : '● OFFLINE',
-                  style: TextStyle(
-                    fontSize: 10,
-                    color: _shizukuReady ? Colors.greenAccent : Colors.redAccent,
-                    letterSpacing: 1,
+      ),
+      body: _checking
+        ? const Center(child: CircularProgressIndicator(color: Color(0xFFA855F7)))
+        : Stack(
+            children: [
+              Positioned.fill(
+                child: Opacity(
+                  opacity: 0.06,
+                  child: Center(
+                    child: Image.asset('assets/logo.jpg', fit: BoxFit.contain),
                   ),
                 ),
               ),
-            ),
-          ),
-        ],
-      ),
-      body: Stack(
-        children: [
-          // Logo transparan di background
-          Positioned.fill(
-            child: Opacity(
-              opacity: 0.08,
-              child: Center(
-                child: Image.asset(
-                  'assets/logo.jpg',
-                  fit: BoxFit.contain,
-                ),
-              ),
-            ),
-          ),
-
-          _checking
-            ? const Center(child: CircularProgressIndicator(color: Color(0xFFA855F7)))
-            : ListView(
+              ListView(
                 padding: const EdgeInsets.all(16),
-                children: _menus.keys.map((k) {
-                  return Container(
-                    margin: const EdgeInsets.only(bottom: 10),
-                    padding: const EdgeInsets.symmetric(horizontal: 16, vertical: 12),
+                children: [
+                  // Card izin overlay
+                  Container(
+                    padding: const EdgeInsets.all(16),
+                    margin: const EdgeInsets.only(bottom: 16),
                     decoration: BoxDecoration(
-                      color: const Color(0xFF13131A).withOpacity(0.9),
+                      color: const Color(0xFF13131A),
                       borderRadius: BorderRadius.circular(12),
-                      border: Border.all(color: const Color(0xFF22222E)),
+                      border: Border.all(
+                        color: _overlayGranted ? Colors.greenAccent : Colors.orangeAccent,
+                      ),
+                    ),
+                    child: Column(
+                      crossAxisAlignment: CrossAxisAlignment.start,
+                      children: [
+                        Text(
+                          _overlayGranted
+                            ? '✓ Izin overlay OK'
+                            : '⚠ Butuh izin "Tampilkan di atas aplikasi lain"',
+                          style: TextStyle(
+                            color: _overlayGranted ? Colors.greenAccent : Colors.orangeAccent,
+                            fontSize: 13, fontWeight: FontWeight.bold,
+                          ),
+                        ),
+                        const SizedBox(height: 8),
+                        if (!_overlayGranted)
+                          SizedBox(
+                            width: double.infinity,
+                            child: ElevatedButton(
+                              onPressed: _requestOverlayPermission,
+                              style: ElevatedButton.styleFrom(
+                                backgroundColor: Colors.orangeAccent,
+                              ),
+                              child: const Text('MINTA IZIN', style: TextStyle(color: Colors.black, fontWeight: FontWeight.bold)),
+                            ),
+                          ),
+                        const SizedBox(height: 8),
+                        SizedBox(
+                          width: double.infinity,
+                          child: ElevatedButton(
+                            onPressed: _showOverlay,
+                            style: ElevatedButton.styleFrom(
+                              backgroundColor: _overlayActive ? Colors.redAccent : const Color(0xFFA855F7),
+                            ),
+                            child: Text(
+                              _overlayActive ? 'SEMBUNYIKAN OVERLAY' : 'TAMPILKAN OVERLAY',
+                              style: const TextStyle(fontWeight: FontWeight.bold, letterSpacing: 2),
+                            ),
+                          ),
+                        ),
+                      ],
+                    ),
+                  ),
+
+                  // Status Shizuku
+                  Container(
+                    padding: const EdgeInsets.symmetric(horizontal: 16, vertical: 12),
+                    margin: const EdgeInsets.only(bottom: 16),
+                    decoration: BoxDecoration(
+                      color: const Color(0xFF13131A),
+                      borderRadius: BorderRadius.circular(12),
+                      border: Border.all(
+                        color: _shizukuReady ? Colors.greenAccent : Colors.redAccent,
+                      ),
                     ),
                     child: Row(
                       mainAxisAlignment: MainAxisAlignment.spaceBetween,
                       children: [
-                        Text(k, style: const TextStyle(color: Colors.white, fontSize: 14, letterSpacing: 1)),
-                        Switch(
-                          value: _menus[k]!,
-                          activeColor: const Color(0xFFA855F7),
-                          onChanged: (v) => _toggle(k, v),
+                        const Text('Shizuku', style: TextStyle(color: Colors.white, fontSize: 13)),
+                        Text(
+                          _shizukuReady ? '● OK' : '● OFFLINE',
+                          style: TextStyle(
+                            color: _shizukuReady ? Colors.greenAccent : Colors.redAccent,
+                            fontSize: 12, fontWeight: FontWeight.bold,
+                          ),
                         ),
                       ],
                     ),
-                  );
-                }).toList(),
+                  ),
+
+                  // Menu cheat
+                  ..._menus.keys.map((k) {
+                    return Container(
+                      margin: const EdgeInsets.only(bottom: 10),
+                      padding: const EdgeInsets.symmetric(horizontal: 16, vertical: 12),
+                      decoration: BoxDecoration(
+                        color: const Color(0xFF13131A).withOpacity(0.9),
+                        borderRadius: BorderRadius.circular(12),
+                        border: Border.all(color: const Color(0xFF22222E)),
+                      ),
+                      child: Row(
+                        mainAxisAlignment: MainAxisAlignment.spaceBetween,
+                        children: [
+                          Text(k, style: const TextStyle(color: Colors.white, fontSize: 14)),
+                          Switch(
+                            value: _menus[k]!,
+                            activeColor: const Color(0xFFA855F7),
+                            onChanged: (v) => _toggle(k, v),
+                          ),
+                        ],
+                      ),
+                    );
+                  }),
+                ],
               ),
-        ],
-      ),
+            ],
+          ),
     );
   }
 }

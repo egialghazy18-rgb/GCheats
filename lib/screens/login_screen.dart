@@ -14,8 +14,8 @@ class _LoginScreenState extends State<LoginScreen> {
   bool _loading = false;
   String _err = '';
 
-  static const _validUser = 'king';
-  static const _validPass = 'ghazy';
+  static const _validUser = 'egi';
+  static const _validPass = 'ganteng';
 
   Future<void> _login() async {
     setState(() { _loading = true; _err = ''; });
@@ -36,83 +36,73 @@ class _LoginScreenState extends State<LoginScreen> {
   @override
   Widget build(BuildContext context) {
     return Scaffold(
-      body: Stack(
-        fit: StackFit.expand,
-        children: [
-          // Background blur gelap
-          Container(
-            decoration: const BoxDecoration(
-              gradient: LinearGradient(
-                begin: Alignment.topLeft,
-                end: Alignment.bottomRight,
-                colors: [Color(0xFF05050A), Color(0xFF1A0B2E), Color(0xFF05050A)],
-              ),
-            ),
+      body: Container(
+        decoration: const BoxDecoration(
+          gradient: LinearGradient(
+            begin: Alignment.topLeft,
+            end: Alignment.bottomRight,
+            colors: [Color(0xFF05050A), Color(0xFF1A0B2E), Color(0xFF05050A)],
           ),
-          Center(
-            child: SingleChildScrollView(
-              padding: const EdgeInsets.all(28),
-              child: Column(
-                mainAxisSize: MainAxisSize.min,
-                children: [
-                  // Logo gambar
-                  Container(
-                    width: 130, height: 130,
-                    decoration: BoxDecoration(
-                      shape: BoxShape.circle,
-                      border: Border.all(color: const Color(0xFFA855F7), width: 2),
-                      boxShadow: [
-                        BoxShadow(
-                          color: const Color(0xFFA855F7).withOpacity(.7),
-                          blurRadius: 50, spreadRadius: 6,
-                        ),
-                      ],
-                    ),
-                    child: ClipOval(
-                      child: Image.asset(
-                        'assets/logo.jpg',
-                        fit: BoxFit.cover,
+        ),
+        child: Center(
+          child: SingleChildScrollView(
+            padding: const EdgeInsets.all(28),
+            child: Column(
+              mainAxisSize: MainAxisSize.min,
+              children: [
+                Container(
+                  width: 130, height: 130,
+                  decoration: BoxDecoration(
+                    shape: BoxShape.circle,
+                    border: Border.all(color: const Color(0xFFA855F7), width: 2),
+                    boxShadow: [
+                      BoxShadow(
+                        color: const Color(0xFFA855F7).withOpacity(.7),
+                        blurRadius: 50, spreadRadius: 6,
                       ),
-                    ),
+                    ],
                   ),
-                  const SizedBox(height: 26),
-                  const Text('G CHEATS',
-                    style: TextStyle(
-                      fontSize: 28, letterSpacing: 8,
-                      color: Colors.white, fontWeight: FontWeight.w700,
-                    ),
+                  child: ClipOval(
+                    child: Image.asset('assets/logo.jpg', fit: BoxFit.cover),
                   ),
-                  const SizedBox(height: 6),
-                  Text('FUTURISTIC PANEL v1.0',
-                    style: TextStyle(color: Colors.white.withOpacity(.4), fontSize: 11, letterSpacing: 3),
+                ),
+                const SizedBox(height: 26),
+                const Text('G CHEATS',
+                  style: TextStyle(
+                    fontSize: 28, letterSpacing: 8,
+                    color: Colors.white, fontWeight: FontWeight.w700,
                   ),
-                  const SizedBox(height: 44),
-                  _field(_user, 'USERNAME', Icons.person_outline),
-                  const SizedBox(height: 14),
-                  _field(_pass, 'PASSWORD', Icons.lock_outline, obscure: true),
-                  if (_err.isNotEmpty) ...[
-                    const SizedBox(height: 12),
-                    Text(_err, style: const TextStyle(color: Colors.redAccent, fontSize: 12, letterSpacing: 2)),
-                  ],
-                  const SizedBox(height: 28),
-                  SizedBox(
-                    width: double.infinity, height: 54,
-                    child: ElevatedButton(
-                      onPressed: _loading ? null : _login,
-                      style: ElevatedButton.styleFrom(
-                        backgroundColor: const Color(0xFFA855F7),
-                        shape: RoundedRectangleBorder(borderRadius: BorderRadius.circular(14)),
-                      ),
-                      child: _loading
-                        ? const SizedBox(width: 22, height: 22, child: CircularProgressIndicator(color: Colors.white, strokeWidth: 2))
-                        : const Text('LOGIN', style: TextStyle(letterSpacing: 6, fontWeight: FontWeight.bold, fontSize: 14)),
-                    ),
-                  ),
+                ),
+                const SizedBox(height: 6),
+                Text('FUTURISTIC PANEL v1.0',
+                  style: TextStyle(color: Colors.white.withOpacity(.4), fontSize: 11, letterSpacing: 3),
+                ),
+                const SizedBox(height: 44),
+                _field(_user, 'USERNAME', Icons.person_outline),
+                const SizedBox(height: 14),
+                _field(_pass, 'PASSWORD', Icons.lock_outline, obscure: true),
+                if (_err.isNotEmpty) ...[
+                  const SizedBox(height: 12),
+                  Text(_err, style: const TextStyle(color: Colors.redAccent, fontSize: 12, letterSpacing: 2)),
                 ],
-              ),
+                const SizedBox(height: 28),
+                SizedBox(
+                  width: double.infinity, height: 54,
+                  child: ElevatedButton(
+                    onPressed: _loading ? null : _login,
+                    style: ElevatedButton.styleFrom(
+                      backgroundColor: const Color(0xFFA855F7),
+                      shape: RoundedRectangleBorder(borderRadius: BorderRadius.circular(14)),
+                    ),
+                    child: _loading
+                      ? const SizedBox(width: 22, height: 22, child: CircularProgressIndicator(color: Colors.white, strokeWidth: 2))
+                      : const Text('LOGIN', style: TextStyle(letterSpacing: 6, fontWeight: FontWeight.bold, fontSize: 14)),
+                  ),
+                ),
+              ],
             ),
           ),
-        ],
+        ),
       ),
     );
   }
