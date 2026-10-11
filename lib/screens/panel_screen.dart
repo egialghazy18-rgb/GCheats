@@ -24,10 +24,6 @@ class _PanelScreenState extends State<PanelScreen> with WidgetsBindingObserver {
     'No Recoil': false,
     'Wall Hack': false,
     'Speed Hack': false,
-    'Auto Headshot': false,
-    'Magic Bullet': false,
-    'Antenna': false,
-    'Fly Hack': false,
   };
 
   @override
@@ -43,12 +39,9 @@ class _PanelScreenState extends State<PanelScreen> with WidgetsBindingObserver {
     super.dispose();
   }
 
-  // Refresh cek izin tiap app balik dari background (Settings)
   @override
   void didChangeAppLifecycleState(AppLifecycleState state) {
-    if (state == AppLifecycleState.resumed) {
-      _refreshPermission();
-    }
+    if (state == AppLifecycleState.resumed) _refreshPermission();
   }
 
   Future<void> _refreshPermission() async {
@@ -59,33 +52,27 @@ class _PanelScreenState extends State<PanelScreen> with WidgetsBindingObserver {
   }
 
   Future<void> _initAll() async {
-    // TUNGGU sebentar — Android kadang butuh waktu buat flush state izin
-    await Future.delayed(const Duration(milliseconds: 500));
-
+    await Future.delayed(const Duration(milliseconds: 400));
     final granted = await FlutterOverlayWindow.isPermissionGranted();
     final shizuku = await ShizukuService.requestPermission();
-
     if (!mounted) return;
     setState(() {
       _overlayGranted = granted;
       _shizukuReady = shizuku;
       _checking = false;
     });
-
     if (!granted) _requestOverlayPermission();
   }
 
   Future<void> _requestOverlayPermission() async {
     await FlutterOverlayWindow.requestPermission();
-    // delay lebih panjang — user butuh waktu nyalain toggle
-    await Future.delayed(const Duration(milliseconds: 1500));
+    await Future.delayed(const Duration(milliseconds: 1200));
     final granted = await FlutterOverlayWindow.isPermissionGranted();
     if (!mounted) return;
     setState(() => _overlayGranted = granted);
   }
 
   Future<void> _showOverlay() async {
-    // Refresh dulu sebelum action
     final granted = await FlutterOverlayWindow.isPermissionGranted();
     if (!mounted) return;
     if (!granted) {
@@ -102,6 +89,7 @@ class _PanelScreenState extends State<PanelScreen> with WidgetsBindingObserver {
     }
 
     try {
+      // === UKURAN CUMA 320x220, POSISI DI KIRI ATAS ===
       await FlutterOverlayWindow.showOverlay(
         enableDrag: false,
         overlayTitle: 'GCheats Aktif',
@@ -109,9 +97,9 @@ class _PanelScreenState extends State<PanelScreen> with WidgetsBindingObserver {
         flag: OverlayFlag.defaultFlag,
         visibility: NotificationVisibility.visibilityPublic,
         positionGravity: PositionGravity.none,
-        height: WindowSize.fullCover,
-        width: WindowSize.fullCover,
-        startPosition: const OverlayPosition(0, 0),
+        height: 220,
+        width: 320,
+        startPosition: const OverlayPosition(0, 80),
       );
       if (!mounted) return;
       setState(() => _overlayActive = true);
@@ -148,9 +136,7 @@ class _PanelScreenState extends State<PanelScreen> with WidgetsBindingObserver {
               Positioned.fill(
                 child: Opacity(
                   opacity: 0.06,
-                  child: Center(
-                    child: Image.asset('assets/logo.jpg', fit: BoxFit.contain),
-                  ),
+                  child: Center(child: Image.asset('assets/logo.jpg', fit: BoxFit.contain)),
                 ),
               ),
               ListView(
@@ -228,28 +214,26 @@ class _PanelScreenState extends State<PanelScreen> with WidgetsBindingObserver {
                       ],
                     ),
                   ),
-                  ..._menus.keys.map((k) {
-                    return Container(
-                      margin: const EdgeInsets.only(bottom: 10),
-                      padding: const EdgeInsets.symmetric(horizontal: 16, vertical: 12),
-                      decoration: BoxDecoration(
-                        color: const Color(0xFF13131A).withOpacity(0.9),
-                        borderRadius: BorderRadius.circular(12),
-                        border: Border.all(color: const Color(0xFF22222E)),
-                      ),
-                      child: Row(
-                        mainAxisAlignment: MainAxisAlignment.spaceBetween,
-                        children: [
-                          Text(k, style: const TextStyle(color: Colors.white, fontSize: 14)),
-                          Switch(
-                            value: _menus[k]!,
-                            activeColor: const Color(0xFFA855F7),
-                            onChanged: (v) => _toggle(k, v),
-                          ),
-                        ],
-                      ),
-                    );
-                  }),
+                  ..._menus.keys.map((k) => Container(
+                    margin: const EdgeInsets.only(bottom: 10),
+                    padding: const EdgeInsets.symmetric(horizontal: 16, vertical: 12),
+                    decoration: BoxDecoration(
+                      color: const Color(0xFF13131A).withOpacity(0.9),
+                      borderRadius: BorderRadius.circular(12),
+                      border: Border.all(color: const Color(0xFF22222E)),
+                    ),
+                    child: Row(
+                      mainAxisAlignment: MainAxisAlignment.spaceBetween,
+                      children: [
+                        Text(k, style: const TextStyle(color: Colors.white, fontSize: 14)),
+                        Switch(
+                          value: _menus[k]!,
+                          activeColor: const Color(0xFFA855F7),
+                          onChanged: (v) => _toggle(k, v),
+                        ),
+                      ],
+                    ),
+                  )),
                 ],
               ),
             ],

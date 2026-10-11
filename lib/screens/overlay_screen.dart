@@ -10,60 +10,89 @@ class OverlayScreen extends StatefulWidget {
 class _OverlayScreenState extends State<OverlayScreen> {
   bool _panelOpen = false;
   Offset _pos = const Offset(20, 200);
+  int _tabIndex = 0;
 
-  final Map<String, bool> _menus = {
-    'Aim Assist': false,
-    'Aim Lock Head': false,
-    'ESP Player': false,
-    'ESP Line': false,
-    'ESP Box': false,
-    'No Recoil': false,
-    'Wall Hack': false,
-    'Speed Hack': false,
-    'Auto Headshot': false,
-    'Magic Bullet': false,
-    'Antenna': false,
-    'Fly Hack': false,
+  // === Menu per tab ===
+  final Map<String, Map<String, bool>> _tabs = {
+    'AIM': {
+      'Aim Assist': false,
+      'Aim Lock Head': false,
+      'Aim Precision': false,
+      'Auto Headshot': false,
+      'Magic Bullet': false,
+    },
+    'ESP': {
+      'ESP Player': false,
+      'ESP Line': false,
+      'ESP Box': false,
+      'ESP Health': false,
+      'Antenna': false,
+    },
+    'MISC': {
+      'No Recoil': false,
+      'Wall Hack': false,
+      'Speed Hack': false,
+      'Fly Hack': false,
+    },
+    'SET': {
+      'Bypass Anti-Cheat': false,
+      'Streamer Mode': false,
+      'Hide Overlay': false,
+    },
   };
 
   @override
   Widget build(BuildContext context) {
     return Material(
       color: Colors.transparent,
-      child: Stack(
-        children: [
-          if (!_panelOpen)
-            Positioned(
-              left: _pos.dx,
-              top: _pos.dy,
-              child: GestureDetector(
-                onPanUpdate: (d) => setState(() => _pos += d.delta),
-                onTap: () => setState(() => _panelOpen = true),
-                child: _buildBubble(),
+      child: IgnorePointer(
+        // === KUNCI: cuma area bubble & panel yang nerima touch ===
+        ignoring: false,
+        child: Stack(
+          children: [
+            // Area kosong transparan yang gak nerima input
+            Positioned.fill(
+              child: IgnorePointer(
+                child: Container(color: Colors.transparent),
               ),
-            )
-          else
-            Positioned(
-              left: _pos.dx,
-              top: _pos.dy,
-              child: _buildPanel(),
             ),
-        ],
+
+            // Bubble
+            if (!_panelOpen)
+              Positioned(
+                left: _pos.dx,
+                top: _pos.dy,
+                child: GestureDetector(
+                  onPanUpdate: (d) => setState(() => _pos += d.delta),
+                  onTap: () => setState(() => _panelOpen = true),
+                  child: _buildBubble(),
+                ),
+              ),
+
+            // Panel
+            if (_panelOpen)
+              Positioned(
+                left: 8,
+                top: 60,
+                child: _buildPanel(),
+              ),
+          ],
+        ),
       ),
     );
   }
 
-  // === BUBBLE KECIL: 40x40 (dari 60) ===
+  // === BUBBLE KECIL 36x36 ===
   Widget _buildBubble() {
     return Container(
-      width: 40, height: 40,
+      width: 36, height: 36,
       decoration: BoxDecoration(
         shape: BoxShape.circle,
         border: Border.all(color: const Color(0xFFA855F7), width: 1.5),
         boxShadow: [
           BoxShadow(
             color: const Color(0xFFA855F7).withOpacity(.9),
-            blurRadius: 12, spreadRadius: 1,
+            blurRadius: 10, spreadRadius: 1,
           ),
         ],
       ),
@@ -75,7 +104,7 @@ class _OverlayScreenState extends State<OverlayScreen> {
             color: const Color(0xFFA855F7),
             child: const Center(
               child: Text('G',
-                style: TextStyle(color: Colors.white, fontSize: 18, fontWeight: FontWeight.bold),
+                style: TextStyle(color: Colors.white, fontSize: 16, fontWeight: FontWeight.bold),
               ),
             ),
           ),
@@ -84,118 +113,191 @@ class _OverlayScreenState extends State<OverlayScreen> {
     );
   }
 
-  // === PANEL KECIL: 200px width (dari 280) ===
+  // === PANEL LANDSCAPE 16:9 (280 x 158) ===
   Widget _buildPanel() {
+    const double w = 290;
+    const double h = 170;
+
     return Container(
-      width: 200,
-      padding: const EdgeInsets.all(6),
+      width: w,
+      height: h,
       decoration: BoxDecoration(
         color: const Color(0xFF0A0A12).withOpacity(0.97),
         borderRadius: BorderRadius.circular(10),
         border: Border.all(color: const Color(0xFFA855F7), width: 1.2),
         boxShadow: [
-          BoxShadow(color: Colors.black.withOpacity(.7), blurRadius: 14),
+          BoxShadow(color: Colors.black.withOpacity(.8), blurRadius: 14),
         ],
       ),
       child: Column(
-        mainAxisSize: MainAxisSize.min,
         children: [
-          // Header
-          Row(
-            mainAxisAlignment: MainAxisAlignment.spaceBetween,
-            children: [
-              Row(
-                children: [
-                  ClipOval(
-                    child: Image.asset('assets/logo.jpg',
-                      width: 16, height: 16, fit: BoxFit.cover,
-                      errorBuilder: (_, __, ___) => const Icon(Icons.security,
-                        color: Color(0xFFA855F7), size: 16),
-                    ),
-                  ),
-                  const SizedBox(width: 4),
-                  const Text('G CHEATS',
-                    style: TextStyle(
-                      color: Colors.white, fontSize: 9,
-                      fontWeight: FontWeight.bold, letterSpacing: 1.5,
-                    ),
-                  ),
-                ],
-              ),
-              GestureDetector(
-                onTap: () => setState(() => _panelOpen = false),
-                child: const Icon(Icons.close, color: Colors.white, size: 14),
-              ),
-            ],
-          ),
-          const SizedBox(height: 4),
-          Container(height: 1, color: const Color(0xFF22222E)),
-          const SizedBox(height: 2),
-
-          // Menu list
-          ..._menus.keys.map((k) => Padding(
-            padding: const EdgeInsets.symmetric(vertical: 0),
+          // === HEADER ===
+          Container(
+            height: 26,
+            padding: const EdgeInsets.symmetric(horizontal: 8),
+            decoration: const BoxDecoration(
+              border: Border(bottom: BorderSide(color: Color(0xFF22222E))),
+            ),
             child: Row(
               mainAxisAlignment: MainAxisAlignment.spaceBetween,
               children: [
-                Text(k, style: const TextStyle(color: Colors.white, fontSize: 9)),
-                Transform.scale(
-                  scale: 0.5,
-                  child: Switch(
-                    value: _menus[k]!,
-                    activeColor: const Color(0xFFA855F7),
-                    materialTapTargetSize: MaterialTapTargetSize.shrinkWrap,
-                    onChanged: (v) => setState(() => _menus[k] = v),
+                Row(
+                  children: [
+                    ClipOval(
+                      child: Image.asset('assets/logo.jpg',
+                        width: 14, height: 14, fit: BoxFit.cover,
+                        errorBuilder: (_, __, ___) => const Icon(Icons.security,
+                          color: Color(0xFFA855F7), size: 14),
+                      ),
+                    ),
+                    const SizedBox(width: 4),
+                    const Text('G CHEATS',
+                      style: TextStyle(
+                        color: Colors.white, fontSize: 10,
+                        fontWeight: FontWeight.bold, letterSpacing: 1.5,
+                      ),
+                    ),
+                  ],
+                ),
+                GestureDetector(
+                  onTap: () => setState(() => _panelOpen = false),
+                  child: const Icon(Icons.close, color: Colors.white, size: 14),
+                ),
+              ],
+            ),
+          ),
+
+          // === TAB ROW ===
+          Container(
+            height: 22,
+            padding: const EdgeInsets.symmetric(horizontal: 4),
+            decoration: const BoxDecoration(
+              border: Border(bottom: BorderSide(color: Color(0xFF22222E))),
+            ),
+            child: Row(
+              children: List.generate(_tabs.length, (i) {
+                final name = _tabs.keys.elementAt(i);
+                final active = _tabIndex == i;
+                return Expanded(
+                  child: GestureDetector(
+                    onTap: () => setState(() => _tabIndex = i),
+                    child: Container(
+                      margin: const EdgeInsets.symmetric(horizontal: 2, vertical: 3),
+                      decoration: BoxDecoration(
+                        color: active ? const Color(0xFFA855F7) : Colors.transparent,
+                        borderRadius: BorderRadius.circular(4),
+                      ),
+                      child: Center(
+                        child: Text(
+                          name,
+                          style: TextStyle(
+                            color: active ? Colors.white : Colors.white54,
+                            fontSize: 9,
+                            fontWeight: active ? FontWeight.bold : FontWeight.normal,
+                          ),
+                        ),
+                      ),
+                    ),
+                  ),
+                );
+              }),
+            ),
+          ),
+
+          // === CONTENT (scrollable) ===
+          Expanded(
+            child: SingleChildScrollView(
+              padding: const EdgeInsets.symmetric(horizontal: 6, vertical: 2),
+              child: Column(
+                children: _tabs[_tabs.keys.elementAt(_tabIndex)]!
+                    .entries
+                    .map((e) => _menuRow(e.key, e.value))
+                    .toList(),
+              ),
+            ),
+          ),
+
+          // === FOOTER BUTTONS ===
+          Container(
+            height: 26,
+            padding: const EdgeInsets.symmetric(horizontal: 6),
+            decoration: const BoxDecoration(
+              border: Border(top: BorderSide(color: Color(0xFF22222E))),
+            ),
+            child: Row(
+              children: [
+                Expanded(
+                  child: SizedBox(
+                    height: 20,
+                    child: ElevatedButton(
+                      onPressed: () {
+                        setState(() {
+                          _tabs[_tabs.keys.elementAt(_tabIndex)]!
+                              .updateAll((k, v) => true);
+                        });
+                      },
+                      style: ElevatedButton.styleFrom(
+                        backgroundColor: const Color(0xFFA855F7),
+                        padding: EdgeInsets.zero,
+                        minimumSize: const Size(0, 20),
+                        tapTargetSize: MaterialTapTargetSize.shrinkWrap,
+                        shape: RoundedRectangleBorder(borderRadius: BorderRadius.circular(3)),
+                      ),
+                      child: const Text('ON',
+                        style: TextStyle(fontSize: 9, fontWeight: FontWeight.bold)),
+                    ),
+                  ),
+                ),
+                const SizedBox(width: 4),
+                Expanded(
+                  child: SizedBox(
+                    height: 20,
+                    child: ElevatedButton(
+                      onPressed: () {
+                        setState(() {
+                          _tabs[_tabs.keys.elementAt(_tabIndex)]!
+                              .updateAll((k, v) => false);
+                        });
+                      },
+                      style: ElevatedButton.styleFrom(
+                        backgroundColor: Colors.redAccent,
+                        padding: EdgeInsets.zero,
+                        minimumSize: const Size(0, 20),
+                        tapTargetSize: MaterialTapTargetSize.shrinkWrap,
+                        shape: RoundedRectangleBorder(borderRadius: BorderRadius.circular(3)),
+                      ),
+                      child: const Text('OFF',
+                        style: TextStyle(fontSize: 9, fontWeight: FontWeight.bold)),
+                    ),
                   ),
                 ),
               ],
             ),
-          )),
+          ),
+        ],
+      ),
+    );
+  }
 
-          const SizedBox(height: 2),
-          Container(height: 1, color: const Color(0xFF22222E)),
-          const SizedBox(height: 4),
-
-          Row(
-            children: [
-              Expanded(
-                child: SizedBox(
-                  height: 22,
-                  child: ElevatedButton(
-                    onPressed: () {},
-                    style: ElevatedButton.styleFrom(
-                      backgroundColor: const Color(0xFFA855F7),
-                      padding: EdgeInsets.zero,
-                      minimumSize: const Size(0, 22),
-                      tapTargetSize: MaterialTapTargetSize.shrinkWrap,
-                    ),
-                    child: const Text('AKTIF',
-                      style: TextStyle(fontSize: 8, fontWeight: FontWeight.bold)),
-                  ),
-                ),
-              ),
-              const SizedBox(width: 3),
-              Expanded(
-                child: SizedBox(
-                  height: 22,
-                  child: ElevatedButton(
-                    onPressed: () {
-                      setState(() {
-                        for (var k in _menus.keys) _menus[k] = false;
-                      });
-                    },
-                    style: ElevatedButton.styleFrom(
-                      backgroundColor: Colors.redAccent,
-                      padding: EdgeInsets.zero,
-                      minimumSize: const Size(0, 22),
-                      tapTargetSize: MaterialTapTargetSize.shrinkWrap,
-                    ),
-                    child: const Text('OFF',
-                      style: TextStyle(fontSize: 8, fontWeight: FontWeight.bold)),
-                  ),
-                ),
-              ),
-            ],
+  Widget _menuRow(String label, bool value) {
+    return SizedBox(
+      height: 20,
+      child: Row(
+        mainAxisAlignment: MainAxisAlignment.spaceBetween,
+        children: [
+          Text(label, style: const TextStyle(color: Colors.white, fontSize: 9)),
+          Transform.scale(
+            scale: 0.5,
+            child: Switch(
+              value: value,
+              activeColor: const Color(0xFFA855F7),
+              materialTapTargetSize: MaterialTapTargetSize.shrinkWrap,
+              onChanged: (v) {
+                setState(() {
+                  _tabs[_tabs.keys.elementAt(_tabIndex)]![label] = v;
+                });
+              },
+            ),
           ),
         ],
       ),
