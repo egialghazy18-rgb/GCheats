@@ -7,52 +7,37 @@ import io.flutter.embedding.engine.FlutterEngine
 import io.flutter.plugin.common.MethodChannel
 
 class MainActivity : FlutterActivity() {
+    private val SHIZUKU_CHANNEL = "nzwx/shizuku"
     private val GAME_CHANNEL = "nzwx/game_detector"
-    private val OVERLAY_CHANNEL = "nzwx/overlay_bridge"
-    private val HOOK_CHANNEL = "nzwx/native_hook"
 
     override fun configureFlutterEngine(flutterEngine: FlutterEngine) {
         super.configureFlutterEngine(flutterEngine)
+
+        MethodChannel(flutterEngine.dartExecutor.binaryMessenger, SHIZUKU_CHANNEL)
+            .setMethodCallHandler { call, result ->
+                when (call.method) {
+                    "isInstalled" -> result.success(ShizukuHelper.isInstalled())
+                    "isRunning" -> result.success(ShizukuHelper.isRunning())
+                    "checkPermission" -> result.success(ShizukuHelper.checkPermission())
+                    "requestPermission" -> {
+                        ShizukuHelper.requestPermission {
+                            result.success(ShizukuHelper.checkPermission())
+                        }
+                    }
+                    "getUid" -> result.success(ShizukuHelper.getUid())
+                    "execShell" -> {
+                        val cmd = call.argument<List<String>>("command") ?: emptyList()
+                        result.success(ShizukuHelper.execShell(cmd.toTypedArray()))
+                    }
+                    else -> result.notImplemented()
+                }
+            }
 
         MethodChannel(flutterEngine.dartExecutor.binaryMessenger, GAME_CHANNEL)
             .setMethodCallHandler { call, result ->
                 when (call.method) {
                     "getForegroundPackage" -> result.success(getForegroundPackage())
                     else -> result.notImplemented()
-                }
-            }
-
-        MethodChannel(flutterEngine.dartExecutor.binaryMessenger, OVERLAY_CHANNEL)
-            .setMethodCallHandler { _, result -> result.success(true) }
-
-        MethodChannel(flutterEngine.dartExecutor.binaryMessenger, HOOK_CHANNEL)
-            .setMethodCallHandler { call, result ->
-                try {
-                    when (call.method) {
-                        "getVersion" -> result.success(NativeHook.getVersion())
-                        "findPid" -> {
-                            val pkg = call.argument<String>("package") ?: ""
-                            result.success(NativeHook.findPidByName(pkg))
-                        }
-                        "findModuleBase" -> {
-                            val pid = call.argument<Int>("pid") ?: -1
-                            val mod = call.argument<String>("module") ?: ""
-                            result.success(NativeHook.findModuleBase(pid, mod))
-                        }
-                        "attach" -> {
-                            val pid = call.argument<Int>("pid") ?: -1
-                            result.success(NativeHook.attachProcess(pid))
-                        }
-                        "writeMemory" -> {
-                            val pid = call.argument<Int>("pid") ?: -1
-                            val addr = call.argument<Long>("addr") ?: 0L
-                            val data = call.argument<ByteArray>("data") ?: ByteArray(0)
-                            result.success(NativeHook.writeMemory(pid, addr, data))
-                        }
-                        else -> result.notImplemented()
-                    }
-                } catch (e: Exception) {
-                    result.error("HOOK_ERR", e.message, null)
                 }
             }
     }
