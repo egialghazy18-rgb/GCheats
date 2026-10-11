@@ -1,6 +1,5 @@
 import 'package:flutter/material.dart';
 import 'package:flutter_overlay_window/flutter_overlay_window.dart';
-import 'package:permission_handler/permission_handler.dart';
 import '../services/shizuku_service.dart';
 import '../services/cheat_service.dart';
 
@@ -38,9 +37,7 @@ class _PanelScreenState extends State<PanelScreen> {
   }
 
   Future<void> _initAll() async {
-    // 1. Cek izin overlay
     final granted = await FlutterOverlayWindow.isPermissionGranted();
-    // 2. Cek Shizuku
     final shizuku = await ShizukuService.requestPermission();
 
     setState(() {
@@ -49,7 +46,6 @@ class _PanelScreenState extends State<PanelScreen> {
       _checking = false;
     });
 
-    // 3. Kalau belum granted → minta
     if (!granted) {
       _requestOverlayPermission();
     }
@@ -75,15 +71,15 @@ class _PanelScreenState extends State<PanelScreen> {
     }
 
     await FlutterOverlayWindow.showOverlay(
-      enableDrag: true,
+      enableDrag: false,
       overlayTitle: 'GCheats',
       overlayContent: 'Panel aktif',
       flag: OverlayFlag.defaultFlag,
       visibility: NotificationVisibility.visibilityPublic,
-      positionGravity: PositionGravity.auto,
-      height: 400,
-      width: 320,
-      startPosition: const OverlayPosition(0, 100),
+      positionGravity: PositionGravity.none,
+      height: WindowSize.fullCover,
+      width: WindowSize.fullCover,
+      startPosition: const OverlayPosition(0, 0),
     );
     setState(() => _overlayActive = true);
   }
@@ -115,7 +111,6 @@ class _PanelScreenState extends State<PanelScreen> {
               ListView(
                 padding: const EdgeInsets.all(16),
                 children: [
-                  // Card izin overlay
                   Container(
                     padding: const EdgeInsets.all(16),
                     margin: const EdgeInsets.only(bottom: 16),
@@ -144,9 +139,7 @@ class _PanelScreenState extends State<PanelScreen> {
                             width: double.infinity,
                             child: ElevatedButton(
                               onPressed: _requestOverlayPermission,
-                              style: ElevatedButton.styleFrom(
-                                backgroundColor: Colors.orangeAccent,
-                              ),
+                              style: ElevatedButton.styleFrom(backgroundColor: Colors.orangeAccent),
                               child: const Text('MINTA IZIN', style: TextStyle(color: Colors.black, fontWeight: FontWeight.bold)),
                             ),
                           ),
@@ -167,17 +160,13 @@ class _PanelScreenState extends State<PanelScreen> {
                       ],
                     ),
                   ),
-
-                  // Status Shizuku
                   Container(
                     padding: const EdgeInsets.symmetric(horizontal: 16, vertical: 12),
                     margin: const EdgeInsets.only(bottom: 16),
                     decoration: BoxDecoration(
                       color: const Color(0xFF13131A),
                       borderRadius: BorderRadius.circular(12),
-                      border: Border.all(
-                        color: _shizukuReady ? Colors.greenAccent : Colors.redAccent,
-                      ),
+                      border: Border.all(color: _shizukuReady ? Colors.greenAccent : Colors.redAccent),
                     ),
                     child: Row(
                       mainAxisAlignment: MainAxisAlignment.spaceBetween,
@@ -193,8 +182,6 @@ class _PanelScreenState extends State<PanelScreen> {
                       ],
                     ),
                   ),
-
-                  // Menu cheat
                   ..._menus.keys.map((k) {
                     return Container(
                       margin: const EdgeInsets.only(bottom: 10),
